@@ -396,3 +396,7 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+build/.cmake
+build/CMakeFiles
+build/generated
+build/pico-sdk
