@@ -400,3 +400,9 @@ build/.cmake
 build/CMakeFiles
 build/generated
 build/pico-sdk
+build/libraries
+build/port
+libraries/FreeRTOS-Kernel
+libraries/ioLibrary_Driver
+libraries/mbedtls
+libraries/pico-extras

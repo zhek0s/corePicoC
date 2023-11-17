@@ -226,7 +226,7 @@ CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO:STRING=
 //Path to a program.
 CMAKE_STRIP:FILEPATH=E:/PicoSDK/gcc-arm-none-eabi/bin/arm-none-eabi-strip.exe
 
-//The CMake toolchain file
+//No help, variable specified on the command line.
 CMAKE_TOOLCHAIN_FILE:FILEPATH=E:/PicoSDK/pico-sdk/cmake/preload/toolchains/pico_arm_gcc.cmake
 
 //If this value is on, makefiles will be generated without the
@@ -240,6 +240,30 @@ DOXYGEN_DOT_EXECUTABLE:FILEPATH=DOXYGEN_DOT_EXECUTABLE-NOTFOUND
 
 //Doxygen documentation generation tool (https://www.doxygen.nl)
 DOXYGEN_EXECUTABLE:FILEPATH=DOXYGEN_EXECUTABLE-NOTFOUND
+
+//Build mbed TLS programs.
+ENABLE_PROGRAMS:BOOL=OFF
+
+//Build mbed TLS tests.
+ENABLE_TESTING:BOOL=OFF
+
+//Build mbed TLS with zlib library.
+ENABLE_ZLIB_SUPPORT:BOOL=OFF
+
+//Git command line client
+GIT_EXECUTABLE:FILEPATH=E:/PicoSDK/git/cmd/git.exe
+
+//Install mbed TLS headers.
+INSTALL_MBEDTLS_HEADERS:BOOL=ON
+
+//Explicitly link mbed TLS library to pthread.
+LINK_WITH_PTHREAD:BOOL=OFF
+
+//Explicitly link mbed TLS library to trusted_storage.
+LINK_WITH_TRUSTED_STORAGE:BOOL=OFF
+
+//Compiler warnings treated as errors
+MBEDTLS_FATAL_WARNINGS:BOOL=ON
 
 //PICO target board (e.g. pico)
 PICO_BOARD:STRING=pico
@@ -295,6 +319,18 @@ PICO_STDIO_UART:BOOL=ON
 //Globally enable stdio USB
 PICO_STDIO_USB:BOOL=OFF
 
+//Allow unsafe builds. These builds ARE NOT SECURE.
+UNSAFE_BUILD:BOOL=OFF
+
+//Build mbed TLS with the pkcs11-helper library.
+USE_PKCS11_HELPER_LIBRARY:BOOL=OFF
+
+//Build mbed TLS shared library.
+USE_SHARED_MBEDTLS_LIBRARY:BOOL=OFF
+
+//Build mbed TLS static library.
+USE_STATIC_MBEDTLS_LIBRARY:BOOL=ON
+
 //Value Computed by CMake
 corePicoC_BINARY_DIR:STATIC=E:/Automato/corePicoC/build
 
@@ -303,6 +339,21 @@ corePicoC_IS_TOP_LEVEL:STATIC=ON
 
 //Value Computed by CMake
 corePicoC_SOURCE_DIR:STATIC=E:/Automato/corePicoC
+
+//Value Computed by CMake
+mbed TLS_BINARY_DIR:STATIC=E:/Automato/corePicoC/build/libraries/mbedtls
+
+//Value Computed by CMake
+mbed TLS_IS_TOP_LEVEL:STATIC=OFF
+
+//Value Computed by CMake
+mbed TLS_SOURCE_DIR:STATIC=E:/Automato/corePicoC/libraries/mbedtls
+
+//Dependencies for the target
+mbedtls_LIB_DEPENDS:STATIC=general;mbedx509;
+
+//Dependencies for the target
+mbedx509_LIB_DEPENDS:STATIC=general;mbedcrypto;
 
 //The directory containing a CMake configuration file for pico-sdk-tools.
 pico-sdk-tools_DIR:PATH=E:/PicoSDK/pico-sdk-tools
@@ -434,7 +485,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=81
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=87
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP
@@ -475,18 +526,24 @@ CMAKE_STATIC_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 CMAKE_STRIP-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//Test C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS
+C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS:INTERNAL=1
 //ADVANCED property for variable: DOXYGEN_DOT_EXECUTABLE
 DOXYGEN_DOT_EXECUTABLE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: DOXYGEN_EXECUTABLE
 DOXYGEN_EXECUTABLE-ADVANCED:INTERNAL=1
 FAMILY_MCUS:INTERNAL=RP2040
+//Details about finding Git
+FIND_PACKAGE_MESSAGE_DETAILS_Git:INTERNAL=[E:/PicoSDK/git/cmd/git.exe][v2.39.1.windows.1()]
 //Details about finding Python3
 FIND_PACKAGE_MESSAGE_DETAILS_Python3:INTERNAL=[C:/Users/Gilijo/AppData/Local/Programs/Python/Python311/python.exe][cfound components: Interpreter ][v3.11.5()]
+//ADVANCED property for variable: GIT_EXECUTABLE
+GIT_EXECUTABLE-ADVANCED:INTERNAL=1
 PICO_BOOT_STAGE2_DIR:INTERNAL=E:/PicoSDK/pico-sdk/src/rp2_common/boot_stage2
 PICO_CMAKE_PRELOAD_PLATFORM_DIR:INTERNAL=E:/PicoSDK/pico-sdk/cmake/preload/platforms
 PICO_CMAKE_PRELOAD_PLATFORM_FILE:INTERNAL=E:/PicoSDK/pico-sdk/cmake/preload/platforms/rp2040.cmake
 PICO_COMPILER_ASM:INTERNAL=E:/PicoSDK/gcc-arm-none-eabi/bin/arm-none-eabi-gcc.exe
-PICO_DOXYGEN_EXCLUDE_PATHS:INTERNAL= E:/PicoSDK/pico-sdk/src/rp2_common/cmsis E:/PicoSDK/pico-sdk/src/rp2040/hardware_regs
+PICO_DOXYGEN_EXCLUDE_PATHS:INTERNAL= E:/PicoSDK/pico-sdk/src/rp2_common/cmsis E:/PicoSDK/pico-sdk/src/rp2040/hardware_regs E:/PicoSDK/pico-sdk/src/rp2_common/cmsis E:/PicoSDK/pico-sdk/src/rp2040/hardware_regs E:/PicoSDK/pico-sdk/src/rp2_common/cmsis E:/PicoSDK/pico-sdk/src/rp2040/hardware_regs E:/PicoSDK/pico-sdk/src/rp2_common/cmsis E:/PicoSDK/pico-sdk/src/rp2040/hardware_regs
 PICO_DOXYGEN_PATHS:INTERNAL= E:/PicoSDK/pico-sdk/src/common E:/PicoSDK/pico-sdk/lib/cyw43-driver/src E:/PicoSDK/pico-sdk/src/rp2_common E:/PicoSDK/pico-sdk/src/rp2040
 PICO_NO_HARDWARE:INTERNAL=0
 PICO_ON_DEVICE:INTERNAL=1
@@ -502,7 +559,7 @@ _Python3_Development_REASON_FAILURE:INTERNAL=
 _Python3_EXECUTABLE:INTERNAL=C:/Users/Gilijo/AppData/Local/Programs/Python/Python311/python.exe
 //Python3 Properties
 _Python3_INTERPRETER_PROPERTIES:INTERNAL=Python;3;11;5;32;;;C:\Users\Gilijo\AppData\Local\Programs\Python\Python311\Lib;C:\Users\Gilijo\AppData\Local\Programs\Python\Python311\Lib;C:\Users\Gilijo\AppData\Local\Programs\Python\Python311\Lib\site-packages;C:\Users\Gilijo\AppData\Local\Programs\Python\Python311\Lib\site-packages
-_Python3_INTERPRETER_SIGNATURE:INTERNAL=da87d6247f74b0e4e20af4dcdaa229ce
+_Python3_INTERPRETER_SIGNATURE:INTERNAL=663cc14fc3f3191e4427805a8b7da4af
 //NumPy reason failure
 _Python3_NumPy_REASON_FAILURE:INTERNAL=
 
