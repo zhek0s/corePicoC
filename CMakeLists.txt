@@ -10,10 +10,15 @@ include(rp2040_hat_freertos_c-patch.cmake)
 include(pico_sdk_import.cmake)
 include(rp2040_hat_freertos_c_sdk_version.cmake)
 
-project(corePicoC C CXX ASM)
+# Set project name
+set(PROJECT_NAME corePicoC)
+# Set project informations
+project(${PROJECT_NAME} C CXX ASM)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
+
+# Initialize the SDK
 pico_sdk_init()
 
 # Set ethernet chip
@@ -75,7 +80,16 @@ add_compile_options(
 add_executable(main
   main.c
 )
-pico_enable_stdio_usb(main 1)
+pico_enable_stdio_usb(main 0)
 pico_enable_stdio_uart(main 1)
 pico_add_extra_outputs(main)
-target_link_libraries(main pico_stdlib)
+target_link_libraries(main 
+    pico_stdlib
+    pico_stdlib
+    hardware_spi
+    hardware_dma
+    ETHERNET_FILES
+    IOLIBRARY_FILES
+    MQTT_FILES
+    TIMER_FILES
+    FREERTOS_FILES)
