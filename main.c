@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <FreeRTOS.h>
+#include <task.h>
+#include <semphr.h>
+
 #include "port/port_common.h"
 
 #include "wizchip_conf.h"
@@ -16,6 +20,17 @@
  * Macros
  * ----------------------------------------------------------------------------------------------------
  */
+
+/* Task */
+#define MQTT_TASK_STACK_SIZE 2048
+#define MQTT_TASK_PRIORITY 10
+
+#define YIELD_TASK_STACK_SIZE 512
+#define YIELD_TASK_PRIORITY 8
+
+#define BUTTON_TASK_STACK_SIZE 512
+#define BUTTON_TASK_PRIORITY 7
+
 /* Clock */
 #define PLL_SYS_KHZ (133 * 1000)
 
@@ -35,17 +50,42 @@
 #define MQTT_CLIENT_ID "rpi-pico"
 #define MQTT_USERNAME "wiznet"
 #define MQTT_PASSWORD "0123456789"
-#define MQTT_PUBLISH_TOPIC "publish_topic"
+#define MQTT_CONFIG_TOPIC "homeassistant/switch/picoRelaySwitch1Channel"
+#define MQTT_PUBLISH_TOPIC "mainController"
 #define MQTT_PUBLISH_PAYLOAD "Hello, World!"
 #define MQTT_PUBLISH_PERIOD (1000 * 10) // 10 seconds
-#define MQTT_SUBSCRIBE_TOPIC "subscribe_topic"
+#define MQTT_SUBSCRIBE_TOPIC "mainController"
 #define MQTT_KEEP_ALIVE 60 // 60 milliseconds
-
+char* topicStat[8]={
+    "homeassistant/switch/picoRelaySwitch1/switch1",
+    "homeassistant/switch/picoRelaySwitch1/switch2",
+    "homeassistant/switch/picoRelaySwitch1/switch3",
+    "homeassistant/switch/picoRelaySwitch1/switch4",
+    "homeassistant/switch/picoRelaySwitch1/switch5",
+    "homeassistant/switch/picoRelaySwitch1/switch6",
+    "homeassistant/switch/picoRelaySwitch1/switch7",
+    "homeassistant/switch/picoRelaySwitch1/switch8"
+};
+char* topicCom[8]={
+    "homeassistant/switch/picoRelaySwitch1Channel1/set",
+    "homeassistant/switch/picoRelaySwitch1Channel2/set",
+    "homeassistant/switch/picoRelaySwitch1Channel3/set",
+    "homeassistant/switch/picoRelaySwitch1Channel4/set",
+    "homeassistant/switch/picoRelaySwitch1Channel5/set",
+    "homeassistant/switch/picoRelaySwitch1Channel6/set",
+    "homeassistant/switch/picoRelaySwitch1Channel7/set",
+    "homeassistant/switch/picoRelaySwitch1Channel8/set"
+};
 /**
  * ----------------------------------------------------------------------------------------------------
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
+/* Pins */
+static uint channelsOut[8] = {7,6,5,4,3,2,22,28};
+static uint channelsIn[8] = {15,14,13,12,11,10,9,8};
+uint channelsStatus[8] = {0,0,0,0,0,0,0,0};
+
 /* Network */
 static wiz_NetInfo g_net_info =
     {
@@ -54,7 +94,7 @@ static wiz_NetInfo g_net_info =
         .sn = {255, 255, 255, 0},                    // Subnet Mask
         .gw = {192, 168, 0, 1},                     // Gateway
         .dns = {8, 8, 8, 8},                         // DNS server
-        .dhcp = NETINFO_DHCP                       // DHCP enable/disable
+        .dhcp = NETINFO_STATIC                       // DHCP enable/disable
 };
 
 /* MQTT */
@@ -64,11 +104,12 @@ static uint8_t g_mqtt_send_buf[ETHERNET_BUF_MAX_SIZE] = {
 static uint8_t g_mqtt_recv_buf[ETHERNET_BUF_MAX_SIZE] = {
     0,
 };
-static uint8_t g_mqtt_broker_ip[4] = {192, 168, 0, 120};
+static uint8_t g_mqtt_broker_ip[4] = {192, 168, 0, 189};
 static Network g_mqtt_network;
 static MQTTClient g_mqtt_client;
 static MQTTPacket_connectData g_mqtt_packet_connect_data = MQTTPacket_connectData_initializer;
 static MQTTMessage g_mqtt_message;
+static uint8_t g_mqtt_connect_flag = 0;
 
 /* Timer  */
 static volatile uint32_t g_msec_cnt = 0;
@@ -79,11 +120,21 @@ static volatile uint32_t g_msec_cnt = 0;
  * Functions
  * ----------------------------------------------------------------------------------------------------
  */
+
+/* Task */
+void mqtt_task(void *argument);
+void yield_task(void *argument);
+void button_task(void *argument);
+
 /* Clock */
 static void set_clock_khz(void);
 
+/* Pin work*/
+void initPins(void);
+
 /* MQTT */
 static void message_arrived(MessageData *msg_data);
+char * getConfigPayload(int j);
 
 /* Timer  */
 static void repeating_timer_callback(void);
@@ -97,13 +148,11 @@ static time_t millis(void);
 int main()
 {
     /* Initialize */
-    int32_t retval = 0;
-    uint32_t start_ms = 0;
-    uint32_t end_ms = 0;
-
     set_clock_khz();
 
     stdio_init_all();
+
+    initPins();
 
     wizchip_spi_initialize();
     wizchip_cris_initialize();
@@ -114,13 +163,35 @@ int main()
 
     wizchip_1ms_timer_initialize(repeating_timer_callback);
 
+    xTaskCreate(mqtt_task, "MQTT_Task", MQTT_TASK_STACK_SIZE, NULL, MQTT_TASK_PRIORITY, NULL);
+    xTaskCreate(yield_task, "YIEDL_Task", YIELD_TASK_STACK_SIZE, NULL, YIELD_TASK_PRIORITY, NULL);
+    xTaskCreate(button_task, "BUTTON_Task", BUTTON_TASK_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL);
+
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        ;
+    }
+}
+
+/**
+ * ----------------------------------------------------------------------------------------------------
+ * Functions
+ * ----------------------------------------------------------------------------------------------------
+ */
+
+/* Task */
+void mqtt_task(void *argument)
+{
+    uint8_t retval;
+
     network_initialize(g_net_info);
 
     /* Get network information */
     print_network_information(g_net_info);
 
     NewNetwork(&g_mqtt_network, SOCKET_MQTT);
-
     retval = ConnectNetwork(&g_mqtt_network, g_mqtt_broker_ip, PORT_MQTT);
 
     if (retval != 1)
@@ -128,7 +199,9 @@ int main()
         printf(" Network connect failed\n");
 
         while (1)
-            ;
+        {
+            vTaskDelay(1000 * 1000);
+        }
     }
 
     /* Initialize MQTT client */
@@ -150,7 +223,9 @@ int main()
         printf(" MQTT connect failed : %d\n", retval);
 
         while (1)
-            ;
+        {
+            vTaskDelay(1000 * 1000);
+        }
     }
 
     printf(" MQTT connected\n");
@@ -159,62 +234,138 @@ int main()
     g_mqtt_message.qos = QOS0;
     g_mqtt_message.retained = 0;
     g_mqtt_message.dup = 0;
+    g_mqtt_message.payload = "";
+    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+
+    int j;
+    for (j = 1; j<9; j++) {
+        char topic[50];
+        sprintf(topic, "%s%d/config", MQTT_CONFIG_TOPIC,j);
+        char *resp = getConfigPayload(j);
+        g_mqtt_message.payload = resp;
+        g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+        retval = MQTTPublish(&g_mqtt_client, topic, &g_mqtt_message);
+        if (retval < 0)
+        {
+            printf(" Publish Config failed : %d\n", retval);
+            while (1)
+            {
+                vTaskDelay(1000 * 1000);
+            }
+        }
+        printf("send config:   %d\n", j );
+    }
+    
+
     g_mqtt_message.payload = MQTT_PUBLISH_PAYLOAD;
     g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
 
     /* Subscribe */
-    retval = MQTTSubscribe(&g_mqtt_client, MQTT_SUBSCRIBE_TOPIC, QOS0, message_arrived);
-
-    if (retval < 0)
-    {
-        printf(" Subscribe failed : %d\n", retval);
-
-        while (1)
-            ;
-    }
-
-    printf(" Subscribed\n");
-
-    start_ms = millis();
-
-    /* Infinite loop */
-    while (1)
-    {
-        if ((retval = MQTTYield(&g_mqtt_client, g_mqtt_packet_connect_data.keepAliveInterval)) < 0)
+    for (j = 1; j<9; j++) {
+        //sprintf(topicCom[j-1],"homeassistant/switch/picoRelaySwitch1Channel%d/set",j);
+        retval = MQTTSubscribe(&g_mqtt_client, topicCom[j-1], QOS0, message_arrived);
+        if (retval < 0)
         {
-            printf(" Yield error : %d\n", retval);
+            printf(" Subscribe failed : %d\n", retval);
 
             while (1)
-                ;
-        }
-
-        end_ms = millis();
-
-        if (end_ms > start_ms + MQTT_PUBLISH_PERIOD)
-        {
-            /* Publish */
-            retval = MQTTPublish(&g_mqtt_client, MQTT_PUBLISH_TOPIC, &g_mqtt_message);
-
-            if (retval < 0)
             {
-                printf(" Publish failed : %d\n", retval);
-
-                while (1)
-                    ;
+                vTaskDelay(1000 * 1000);
             }
-
-            printf(" Published\n");
-
-            start_ms = millis();
         }
+        printf(" Subscribed Channel %d\n%s\n",j,topicCom[j-1]);
+    }
+
+
+    g_mqtt_connect_flag = 1;
+
+    while (1)
+    {
+        /* Publish */
+        g_mqtt_message.payload = MQTT_PUBLISH_PAYLOAD;
+        g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+        retval = MQTTPublish(&g_mqtt_client, MQTT_PUBLISH_TOPIC, &g_mqtt_message);
+
+        if (retval < 0)
+        {
+            printf(" Publish failed : %d\n", retval);
+
+            while (1)
+            {
+                vTaskDelay(1000 * 1000);
+            }
+        }
+
+        printf(" Published\n");
+
+        vTaskDelay(MQTT_PUBLISH_PERIOD);
     }
 }
 
-/**
- * ----------------------------------------------------------------------------------------------------
- * Functions
- * ----------------------------------------------------------------------------------------------------
- */
+void yield_task(void *argument)
+{
+    int retval;
+
+    while (1)
+    {
+        if (g_mqtt_connect_flag == 1)
+        {
+            if ((retval = MQTTYield(&g_mqtt_client, g_mqtt_packet_connect_data.keepAliveInterval)) < 0)
+            {
+                printf(" Yield error : %d\n", retval);
+
+                while (1)
+                {
+                    vTaskDelay(1000 * 1000);
+                }
+            }
+        }
+
+        vTaskDelay(10);
+    }
+}
+
+void button_task(void *argument)
+{
+    while (1)
+    {
+        for(int i=0; i<8; i++){
+            if (gpio_get(channelsIn[i])) {
+                vTaskDelay(200);
+                if (!gpio_get(channelsIn[i])) {
+                    printf("PRESS");
+                    if (channelsStatus[i]) {
+                        g_mqtt_message.payload = "OFF";
+                        channelsStatus[i]=0;
+                    }else{
+                        g_mqtt_message.payload = "ON";
+                        channelsStatus[i]=1;
+                    }
+                    gpio_put(channelsOut[i], channelsStatus[i]);
+                    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+                    MQTTPublish(&g_mqtt_client, topicStat[i], &g_mqtt_message);
+                    vTaskDelay(200);
+                }else{
+                    printf("LONG PRESS");
+                    if (channelsStatus[i]) {
+                        g_mqtt_message.payload = "OFF";
+                        channelsStatus[i]=0;
+                    }else{
+                        g_mqtt_message.payload = "ON";
+                        channelsStatus[i]=1;
+                    }
+                    gpio_put(channelsOut[i], channelsStatus[i]);
+                    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+                    MQTTPublish(&g_mqtt_client, topicStat[i], &g_mqtt_message);
+                    vTaskDelay(200);
+
+                }
+            }
+        }
+        vTaskDelay(100);
+    }
+}
+
 /* Clock */
 static void set_clock_khz(void)
 {
@@ -231,12 +382,75 @@ static void set_clock_khz(void)
     );
 }
 
+/* Pin Work */
+void initPins(void)
+{
+    for (int j = 0; j < 8 ; j++) {
+        gpio_init(channelsOut[j]);
+        gpio_set_dir(channelsOut[j], GPIO_OUT);
+        gpio_init(channelsIn[j]);
+        gpio_set_dir(channelsIn[j], GPIO_IN);
+    }
+}
+
 /* MQTT */
 static void message_arrived(MessageData *msg_data)
 {
     MQTTMessage *message = msg_data->message;
-
+    char* topic;
+    topic = msg_data->topicName->lenstring.data;
+    uint channel=10;
+    for(int i=0;i<8;i++){
+        if(strstr(topic,topicCom[i])!=NULL){
+            channel=i;
+            printf("Channel detected:%d,Com:%d\n",channel,message->payloadlen);
+            printf("Get:%s\n",topic);
+            printf("Set:%s\n",topicCom[i]);
+            break;
+        }
+    }
+    if(channel!=10){
+        if (message->payloadlen==2) {
+            channelsStatus[channel]=1;
+            g_mqtt_message.payload = "ON";
+        }else{
+            channelsStatus[channel]=0;
+            g_mqtt_message.payload = "OFF";
+        }
+        gpio_put(channelsOut[channel], channelsStatus[channel]);
+        g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+        MQTTPublish(&g_mqtt_client, topicStat[channel], &g_mqtt_message);
+    }
+    topic[0]='\0';
     printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
+}
+
+char * getConfigPayload(int j)
+{
+    int i = j;
+    char unique_id[] = "picoSwitch1Channel";
+    char name[] = "picoRelaySwitch1";
+    char _topic[] = "homeassistant/switch/";
+    char conf[450];
+    sprintf(conf,
+            "{\n"
+            "\"unique_id\":\"%s%d\",\n"
+            "\"name\":\"%sChannel%d\",\n"
+            "\"state_topic\":\"%s%s/switch%d\",\n"
+            "\"command_topic\":\"%s%sChannel%d/set\",\n"
+            //"\"availability\":\"%s%s/switch/available\",\n"
+            "\"payload_on\":\"ON\",\n"
+            "\"payload_off\":\"OFF\",\n"
+            "\"state_on\":\"ON\",\n"
+            "\"state_off\":\"OFF\"\n"
+            "}",
+            unique_id, i,
+            name,i,
+            _topic,name,i,
+            _topic,name,i);
+            //_topic,name);
+    char *resp = conf;
+    return resp;
 }
 
 /* Timer */
