@@ -16,6 +16,7 @@ void initPicoRole(void)
     PICO_ROLE.getConfigPayload = _getConfigPayload;
 #if _PICO_ROLE_DEF_ == relaySwitch
     PICO_ROLE.initPins = initPinsRelaySwitch;
+    PICO_ROLE.mqtt.message_arrived = message_arrivedRelaySwitch;
 #endif
     printf("Role set!\n");
 }

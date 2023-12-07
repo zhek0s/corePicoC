@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "../port/port_common.h"
+#include "mqtt_interface.h"
+#include "MQTTClient.h"
 
 #ifndef _PICO_ROLE_DEF_
 #define _PICO_ROLE_DEF_                      relaySwitch   // relaySwitch
@@ -11,6 +13,8 @@
 #define _PICO_RELAYSWITCH_TYPE_ "switch"
 #define _PICO_RELAYSWITCH_CHANNELS_ 8
 
+static MQTTClient g_mqtt_client;
+static MQTTMessage g_mqtt_message;
 
 typedef struct __PICO_ROLE
 {
@@ -21,6 +25,11 @@ typedef struct __PICO_ROLE
     uint channelsStatus[8];
     char* (*getConfigPayload)(int j);
     void (*initPins)(void);
+    struct
+    {
+        void (*message_arrived)(MessageData *msg_data);
+    }mqtt;
+    
 }_PICO_ROLE;
 extern _PICO_ROLE  PICO_ROLE;
 
@@ -31,3 +40,4 @@ void generateTopicCom(void);
 
 //relaySwitch
 void initPinsRelaySwitch(void);
+void message_arrivedRelaySwitch(MessageData *msg_data);

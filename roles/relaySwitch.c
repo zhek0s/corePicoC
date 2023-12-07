@@ -10,3 +10,34 @@ void initPinsRelaySwitch(void)
         gpio_set_dir(PICO_ROLE.channelsIn[j], GPIO_IN);
     }
 }
+
+void message_arrivedRelaySwitch(MessageData *msg_data)
+{
+    MQTTMessage *message = msg_data->message;
+    char* topic;
+    topic = msg_data->topicName->lenstring.data;
+    uint channel=10;
+    for(int i=0;i<8;i++){
+        if(strstr(topic,PICO_ROLE.topicCom[i])!=NULL){
+            channel=i;
+            printf("Channel detected:%d,Com:%d\n",channel,message->payloadlen);
+            printf("Get:%s\n",topic);
+            printf("Set:%s\n",PICO_ROLE.topicCom[i]);
+            break;
+        }
+    }
+    if(channel!=10){
+        if (message->payloadlen==2) {
+            PICO_ROLE.channelsStatus[channel]=1;
+            g_mqtt_message.payload = "ON";
+        }else{
+            PICO_ROLE.channelsStatus[channel]=0;
+            g_mqtt_message.payload = "OFF";
+        }
+        gpio_put(PICO_ROLE.channelsOut[channel], PICO_ROLE.channelsStatus[channel]);
+        g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+        MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[channel], &g_mqtt_message);
+    }
+    topic[0]='\0';
+    printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
+}

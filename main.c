@@ -81,9 +81,7 @@ static uint8_t g_mqtt_recv_buf[ETHERNET_BUF_MAX_SIZE] = {
 };
 static uint8_t g_mqtt_broker_ip[4] = {192, 168, 0, 189};
 static Network g_mqtt_network;
-static MQTTClient g_mqtt_client;
 static MQTTPacket_connectData g_mqtt_packet_connect_data = MQTTPacket_connectData_initializer;
-static MQTTMessage g_mqtt_message;
 static uint8_t g_mqtt_connect_flag = 0;
 
 /* Timer  */
@@ -103,10 +101,6 @@ void button_task(void *argument);
 
 /* Clock */
 static void set_clock_khz(void);
-
-/* MQTT */
-static void message_arrived(MessageData *msg_data);
-char * getConfigPayload(int j);
 
 /* Timer  */
 static void repeating_timer_callback(void);
@@ -236,7 +230,7 @@ void mqtt_task(void *argument)
     /* Subscribe */
     for (j = 1; j<9; j++) {
         //sprintf(topicCom[j-1],"homeassistant/switch/picoRelaySwitch1Channel%d/set",j);
-        retval = MQTTSubscribe(&g_mqtt_client, PICO_ROLE.topicCom[j-1], QOS0, message_arrived);
+        retval = MQTTSubscribe(&g_mqtt_client, PICO_ROLE.topicCom[j-1], QOS0, PICO_ROLE.mqtt.message_arrived);
         if (retval < 0)
         {
             printf(" Subscribe failed : %d\n", retval);
@@ -353,40 +347,6 @@ static void set_clock_khz(void)
         PLL_SYS_KHZ * 1000,                               // Input frequency
         PLL_SYS_KHZ * 1000                                // Output (must be same as no divider)
     );
-}
-
-
-
-/* MQTT */
-static void message_arrived(MessageData *msg_data)
-{
-    MQTTMessage *message = msg_data->message;
-    char* topic;
-    topic = msg_data->topicName->lenstring.data;
-    uint channel=10;
-    for(int i=0;i<8;i++){
-        if(strstr(topic,PICO_ROLE.topicCom[i])!=NULL){
-            channel=i;
-            printf("Channel detected:%d,Com:%d\n",channel,message->payloadlen);
-            printf("Get:%s\n",topic);
-            printf("Set:%s\n",PICO_ROLE.topicCom[i]);
-            break;
-        }
-    }
-    if(channel!=10){
-        if (message->payloadlen==2) {
-            PICO_ROLE.channelsStatus[channel]=1;
-            g_mqtt_message.payload = "ON";
-        }else{
-            PICO_ROLE.channelsStatus[channel]=0;
-            g_mqtt_message.payload = "OFF";
-        }
-        gpio_put(PICO_ROLE.channelsOut[channel], PICO_ROLE.channelsStatus[channel]);
-        g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-        MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[channel], &g_mqtt_message);
-    }
-    topic[0]='\0';
-    printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
 }
 
 /* Timer */
