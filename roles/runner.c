@@ -88,7 +88,7 @@ char * _getConfigPayload(int j)
 {
     int i = j;
     char _topic[] = "homeassistant";
-    char conf[450];
+    char conf[550];
     char serial[10];
     char name[20];
     char type[20];
@@ -103,7 +103,7 @@ char * _getConfigPayload(int j)
             "\"name\":\"%s%sChannel%d\",\n"
             "\"state_topic\":\"%s/%s/%s%sChannel%d/%s\",\n"
             "\"command_topic\":\"%s/%s/%s%sChannel%d/set\",\n"
-            //"\"availability\":\"%s%s/switch/available\",\n"
+            "\"availability_topic\":\"homeassistant/switch/picoRelaySwitch1Channel1/available\",\n"
             "\"payload_on\":\"ON\",\n"
             "\"payload_off\":\"OFF\",\n"
             "\"state_on\":\"ON\",\n"

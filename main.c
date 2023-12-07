@@ -48,8 +48,8 @@
 #define MQTT_CLIENT_ID "rpi-pico"
 #define MQTT_USERNAME "wiznet"
 #define MQTT_PASSWORD "0123456789"
-#define MQTT_PUBLISH_TOPIC "mainController"
-#define MQTT_PUBLISH_PAYLOAD "Hello, World!"
+#define MQTT_PUBLISH_TOPIC "homeassistant/switch/picoRelaySwitch1Channel1/available"
+#define MQTT_PUBLISH_PAYLOAD "online"
 #define MQTT_PUBLISH_PERIOD (1000 * 10) // 10 seconds
 #define MQTT_SUBSCRIBE_TOPIC "mainController"
 #define MQTT_KEEP_ALIVE 60 // 60 milliseconds
