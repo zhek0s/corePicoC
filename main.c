@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <string.h>
-
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
@@ -15,6 +12,7 @@
 
 #include "timer.h"
 
+#include "roles/runner.h"
 /**
  * ----------------------------------------------------------------------------------------------------
  * Macros
@@ -56,35 +54,12 @@
 #define MQTT_PUBLISH_PERIOD (1000 * 10) // 10 seconds
 #define MQTT_SUBSCRIBE_TOPIC "mainController"
 #define MQTT_KEEP_ALIVE 60 // 60 milliseconds
-char* topicStat[8]={
-    "homeassistant/switch/picoRelaySwitch1/switch1",
-    "homeassistant/switch/picoRelaySwitch1/switch2",
-    "homeassistant/switch/picoRelaySwitch1/switch3",
-    "homeassistant/switch/picoRelaySwitch1/switch4",
-    "homeassistant/switch/picoRelaySwitch1/switch5",
-    "homeassistant/switch/picoRelaySwitch1/switch6",
-    "homeassistant/switch/picoRelaySwitch1/switch7",
-    "homeassistant/switch/picoRelaySwitch1/switch8"
-};
-char* topicCom[8]={
-    "homeassistant/switch/picoRelaySwitch1Channel1/set",
-    "homeassistant/switch/picoRelaySwitch1Channel2/set",
-    "homeassistant/switch/picoRelaySwitch1Channel3/set",
-    "homeassistant/switch/picoRelaySwitch1Channel4/set",
-    "homeassistant/switch/picoRelaySwitch1Channel5/set",
-    "homeassistant/switch/picoRelaySwitch1Channel6/set",
-    "homeassistant/switch/picoRelaySwitch1Channel7/set",
-    "homeassistant/switch/picoRelaySwitch1Channel8/set"
-};
+
 /**
  * ----------------------------------------------------------------------------------------------------
  * Variables
  * ----------------------------------------------------------------------------------------------------
  */
-/* Pins */
-static uint channelsOut[8] = {7,6,5,4,3,2,22,28};
-static uint channelsIn[8] = {15,14,13,12,11,10,9,8};
-uint channelsStatus[8] = {0,0,0,0,0,0,0,0};
 
 /* Network */
 static wiz_NetInfo g_net_info =
@@ -152,6 +127,7 @@ int main()
 
     stdio_init_all();
 
+    initPicoRole();
     initPins();
 
     wizchip_spi_initialize();
@@ -241,7 +217,7 @@ void mqtt_task(void *argument)
     for (j = 1; j<9; j++) {
         char topic[50];
         sprintf(topic, "%s%d/config", MQTT_CONFIG_TOPIC,j);
-        char *resp = getConfigPayload(j);
+        char *resp = PICO_ROLE.getConfigPayload(j);
         g_mqtt_message.payload = resp;
         g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
         retval = MQTTPublish(&g_mqtt_client, topic, &g_mqtt_message);
@@ -263,7 +239,7 @@ void mqtt_task(void *argument)
     /* Subscribe */
     for (j = 1; j<9; j++) {
         //sprintf(topicCom[j-1],"homeassistant/switch/picoRelaySwitch1Channel%d/set",j);
-        retval = MQTTSubscribe(&g_mqtt_client, topicCom[j-1], QOS0, message_arrived);
+        retval = MQTTSubscribe(&g_mqtt_client, PICO_ROLE.topicCom[j-1], QOS0, message_arrived);
         if (retval < 0)
         {
             printf(" Subscribe failed : %d\n", retval);
@@ -273,7 +249,7 @@ void mqtt_task(void *argument)
                 vTaskDelay(1000 * 1000);
             }
         }
-        printf(" Subscribed Channel %d\n%s\n",j,topicCom[j-1]);
+        printf(" Subscribed Channel %d\n%s\n",j,PICO_ROLE.topicCom[j-1]);
     }
 
 
@@ -330,33 +306,33 @@ void button_task(void *argument)
     while (1)
     {
         for(int i=0; i<8; i++){
-            if (gpio_get(channelsIn[i])) {
+            if (gpio_get(PICO_ROLE.channelsIn[i])) {
                 vTaskDelay(200);
-                if (!gpio_get(channelsIn[i])) {
+                if (!gpio_get(PICO_ROLE.channelsIn[i])) {
                     printf("PRESS");
-                    if (channelsStatus[i]) {
+                    if (PICO_ROLE.channelsStatus[i]) {
                         g_mqtt_message.payload = "OFF";
-                        channelsStatus[i]=0;
+                        PICO_ROLE.channelsStatus[i]=0;
                     }else{
                         g_mqtt_message.payload = "ON";
-                        channelsStatus[i]=1;
+                        PICO_ROLE.channelsStatus[i]=1;
                     }
-                    gpio_put(channelsOut[i], channelsStatus[i]);
+                    gpio_put(PICO_ROLE.channelsOut[i], PICO_ROLE.channelsStatus[i]);
                     g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-                    MQTTPublish(&g_mqtt_client, topicStat[i], &g_mqtt_message);
+                    MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[i], &g_mqtt_message);
                     vTaskDelay(200);
                 }else{
                     printf("LONG PRESS");
-                    if (channelsStatus[i]) {
+                    if (PICO_ROLE.channelsStatus[i]) {
                         g_mqtt_message.payload = "OFF";
-                        channelsStatus[i]=0;
+                        PICO_ROLE.channelsStatus[i]=0;
                     }else{
                         g_mqtt_message.payload = "ON";
-                        channelsStatus[i]=1;
+                        PICO_ROLE.channelsStatus[i]=1;
                     }
-                    gpio_put(channelsOut[i], channelsStatus[i]);
+                    gpio_put(PICO_ROLE.channelsOut[i], PICO_ROLE.channelsStatus[i]);
                     g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-                    MQTTPublish(&g_mqtt_client, topicStat[i], &g_mqtt_message);
+                    MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[i], &g_mqtt_message);
                     vTaskDelay(200);
 
                 }
@@ -386,10 +362,10 @@ static void set_clock_khz(void)
 void initPins(void)
 {
     for (int j = 0; j < 8 ; j++) {
-        gpio_init(channelsOut[j]);
-        gpio_set_dir(channelsOut[j], GPIO_OUT);
-        gpio_init(channelsIn[j]);
-        gpio_set_dir(channelsIn[j], GPIO_IN);
+        gpio_init(PICO_ROLE.channelsOut[j]);
+        gpio_set_dir(PICO_ROLE.channelsOut[j], GPIO_OUT);
+        gpio_init(PICO_ROLE.channelsIn[j]);
+        gpio_set_dir(PICO_ROLE.channelsIn[j], GPIO_IN);
     }
 }
 
@@ -401,56 +377,28 @@ static void message_arrived(MessageData *msg_data)
     topic = msg_data->topicName->lenstring.data;
     uint channel=10;
     for(int i=0;i<8;i++){
-        if(strstr(topic,topicCom[i])!=NULL){
+        if(strstr(topic,PICO_ROLE.topicCom[i])!=NULL){
             channel=i;
             printf("Channel detected:%d,Com:%d\n",channel,message->payloadlen);
             printf("Get:%s\n",topic);
-            printf("Set:%s\n",topicCom[i]);
+            printf("Set:%s\n",PICO_ROLE.topicCom[i]);
             break;
         }
     }
     if(channel!=10){
         if (message->payloadlen==2) {
-            channelsStatus[channel]=1;
+            PICO_ROLE.channelsStatus[channel]=1;
             g_mqtt_message.payload = "ON";
         }else{
-            channelsStatus[channel]=0;
+            PICO_ROLE.channelsStatus[channel]=0;
             g_mqtt_message.payload = "OFF";
         }
-        gpio_put(channelsOut[channel], channelsStatus[channel]);
+        gpio_put(PICO_ROLE.channelsOut[channel], PICO_ROLE.channelsStatus[channel]);
         g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-        MQTTPublish(&g_mqtt_client, topicStat[channel], &g_mqtt_message);
+        MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[channel], &g_mqtt_message);
     }
     topic[0]='\0';
     printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
-}
-
-char * getConfigPayload(int j)
-{
-    int i = j;
-    char unique_id[] = "picoSwitch1Channel";
-    char name[] = "picoRelaySwitch1";
-    char _topic[] = "homeassistant/switch/";
-    char conf[450];
-    sprintf(conf,
-            "{\n"
-            "\"unique_id\":\"%s%d\",\n"
-            "\"name\":\"%sChannel%d\",\n"
-            "\"state_topic\":\"%s%s/switch%d\",\n"
-            "\"command_topic\":\"%s%sChannel%d/set\",\n"
-            //"\"availability\":\"%s%s/switch/available\",\n"
-            "\"payload_on\":\"ON\",\n"
-            "\"payload_off\":\"OFF\",\n"
-            "\"state_on\":\"ON\",\n"
-            "\"state_off\":\"OFF\"\n"
-            "}",
-            unique_id, i,
-            name,i,
-            _topic,name,i,
-            _topic,name,i);
-            //_topic,name);
-    char *resp = conf;
-    return resp;
 }
 
 /* Timer */

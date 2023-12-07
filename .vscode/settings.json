@@ -21,6 +21,8 @@
     "cortex-debug.openocdPath": "E:/MSYS2/home/Gilijo/openocd/src/openocd.exe",
     "C_Cpp.errorSquiggles": "enabled",
     "files.associations": {
-        "typeinfo": "c"
+        "typeinfo": "c",
+        "semphr.h": "c",
+        "runner.h": "c"
     }
 }

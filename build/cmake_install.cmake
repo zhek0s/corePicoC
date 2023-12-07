@@ -43,6 +43,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("E:/Automato/corePicoC/build/libraries/cmake_install.cmake")
   include("E:/Automato/corePicoC/build/libraries/mbedtls/cmake_install.cmake")
   include("E:/Automato/corePicoC/build/port/cmake_install.cmake")
+  include("E:/Automato/corePicoC/build/roles/cmake_install.cmake")
 
 endif()
 

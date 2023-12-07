@@ -406,3 +406,4 @@ libraries/FreeRTOS-Kernel
 libraries/ioLibrary_Driver
 libraries/mbedtls
 libraries/pico-extras
+build/roles
