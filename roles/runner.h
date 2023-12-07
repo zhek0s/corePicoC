@@ -3,6 +3,7 @@
 #include "../port/port_common.h"
 #include "mqtt_interface.h"
 #include "MQTTClient.h"
+#include <FreeRTOS.h>
 
 #ifndef _PICO_ROLE_DEF_
 #define _PICO_ROLE_DEF_                      relaySwitch   // relaySwitch
@@ -23,10 +24,14 @@ typedef struct __PICO_ROLE
     uint channelsOut[8];
     uint channelsIn[8];
     uint channelsStatus[8];
+    int channelsNum;
+    char* (*getConfigTopic)(int j);
     char* (*getConfigPayload)(int j);
     void (*initPins)(void);
+    void (*task)(void *argument);
     struct
     {
+        MQTTClient client;
         void (*message_arrived)(MessageData *msg_data);
     }mqtt;
     
@@ -35,9 +40,11 @@ extern _PICO_ROLE  PICO_ROLE;
 
 void initPicoRole(void);
 char * _getConfigPayload(int j);
+char * _getConfigTopic(int j);
 void generateTopicStat(void);
 void generateTopicCom(void);
 
 //relaySwitch
 void initPinsRelaySwitch(void);
 void message_arrivedRelaySwitch(MessageData *msg_data);
+void button_taskRelaySwitch(void *argument);

@@ -36,8 +36,50 @@ void message_arrivedRelaySwitch(MessageData *msg_data)
         }
         gpio_put(PICO_ROLE.channelsOut[channel], PICO_ROLE.channelsStatus[channel]);
         g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-        MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[channel], &g_mqtt_message);
+        MQTTPublish(&PICO_ROLE.mqtt.client, PICO_ROLE.topicStat[channel], &g_mqtt_message);
     }
     topic[0]='\0';
     printf("%.*s", (uint32_t)message->payloadlen, (uint8_t *)message->payload);
+}
+
+//TASK
+void button_taskRelaySwitch(void *argument)
+{
+    while (1)
+    {
+        for(int i=0; i<8; i++){
+            if (gpio_get(PICO_ROLE.channelsIn[i])) {
+                vTaskDelay(200);
+                if (!gpio_get(PICO_ROLE.channelsIn[i])) {
+                    printf("PRESS");
+                    if (PICO_ROLE.channelsStatus[i]) {
+                        g_mqtt_message.payload = "OFF";
+                        PICO_ROLE.channelsStatus[i]=0;
+                    }else{
+                        g_mqtt_message.payload = "ON";
+                        PICO_ROLE.channelsStatus[i]=1;
+                    }
+                    gpio_put(PICO_ROLE.channelsOut[i], PICO_ROLE.channelsStatus[i]);
+                    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+                    MQTTPublish(&PICO_ROLE.mqtt.client, PICO_ROLE.topicStat[i], &g_mqtt_message);
+                    vTaskDelay(200);
+                }else{
+                    printf("LONG PRESS");
+                    if (PICO_ROLE.channelsStatus[i]) {
+                        g_mqtt_message.payload = "OFF";
+                        PICO_ROLE.channelsStatus[i]=0;
+                    }else{
+                        g_mqtt_message.payload = "ON";
+                        PICO_ROLE.channelsStatus[i]=1;
+                    }
+                    gpio_put(PICO_ROLE.channelsOut[i], PICO_ROLE.channelsStatus[i]);
+                    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
+                    MQTTPublish(&PICO_ROLE.mqtt.client, PICO_ROLE.topicStat[i], &g_mqtt_message);
+                    vTaskDelay(200);
+
+                }
+            }
+        }
+        vTaskDelay(100);
+    }
 }

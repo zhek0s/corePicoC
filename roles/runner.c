@@ -3,6 +3,8 @@
 _PICO_ROLE  PICO_ROLE;
 void initPicoRole(void)
 {
+    PICO_ROLE.mqtt.client = g_mqtt_client;
+
     generateTopicStat();
     generateTopicCom();
     uint channelsOut[8] = {7,6,5,4,3,2,22,28};
@@ -14,9 +16,12 @@ void initPicoRole(void)
         PICO_ROLE.channelsStatus[i] = channelsStatus[i];
     }
     PICO_ROLE.getConfigPayload = _getConfigPayload;
+    PICO_ROLE.getConfigTopic = _getConfigTopic;
 #if _PICO_ROLE_DEF_ == relaySwitch
+    PICO_ROLE.channelsNum = _PICO_RELAYSWITCH_CHANNELS_;
     PICO_ROLE.initPins = initPinsRelaySwitch;
     PICO_ROLE.mqtt.message_arrived = message_arrivedRelaySwitch;
+    PICO_ROLE.task = button_taskRelaySwitch;
 #endif
     printf("Role set!\n");
 }
@@ -59,6 +64,24 @@ void generateTopicCom(void)
         sprintf(topic,"homeassistant/%s/%s%sChannel%d/set",type,name,serial,i+1);
         strcpy(PICO_ROLE.topicCom[i],topic);
     }
+}
+
+char * _getConfigTopic(int j)
+{
+    //"homeassistant/switch/picoRelaySwitch1Channel1/config"
+    char _topic[] = "homeassistant";
+    char conf[80];
+    char serial[10];
+    char name[20];
+    char type[20];
+#if _PICO_ROLE_DEF_ == relaySwitch
+    strcpy(name,_PICO_RELAYSWITCH_NAME_);
+    strcpy(type,_PICO_RELAYSWITCH_TYPE_);
+    strcpy(serial,_PICO_RELAYSWITCH_SERIAL_);
+#endif
+    sprintf(conf, "%s/%s/%s%sChannel%d/config", _topic,type,name,serial,j);
+    char *resp = conf;
+    return resp;
 }
 
 char * _getConfigPayload(int j)

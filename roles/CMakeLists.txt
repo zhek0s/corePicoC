@@ -15,6 +15,6 @@ target_link_libraries(ROLES_FILES PRIVATE
         pico_stdlib
         hardware_spi
         hardware_dma
-        MQTT_FILES)
-#        FREERTOS_FILES
+        MQTT_FILES
+        FREERTOS_FILES)
 #        )

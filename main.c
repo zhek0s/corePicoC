@@ -48,7 +48,6 @@
 #define MQTT_CLIENT_ID "rpi-pico"
 #define MQTT_USERNAME "wiznet"
 #define MQTT_PASSWORD "0123456789"
-#define MQTT_CONFIG_TOPIC "homeassistant/switch/picoRelaySwitch1Channel"
 #define MQTT_PUBLISH_TOPIC "mainController"
 #define MQTT_PUBLISH_PAYLOAD "Hello, World!"
 #define MQTT_PUBLISH_PERIOD (1000 * 10) // 10 seconds
@@ -97,7 +96,6 @@ static volatile uint32_t g_msec_cnt = 0;
 /* Task */
 void mqtt_task(void *argument);
 void yield_task(void *argument);
-void button_task(void *argument);
 
 /* Clock */
 static void set_clock_khz(void);
@@ -132,7 +130,7 @@ int main()
 
     xTaskCreate(mqtt_task, "MQTT_Task", MQTT_TASK_STACK_SIZE, NULL, MQTT_TASK_PRIORITY, NULL);
     xTaskCreate(yield_task, "YIEDL_Task", YIELD_TASK_STACK_SIZE, NULL, YIELD_TASK_PRIORITY, NULL);
-    xTaskCreate(button_task, "BUTTON_Task", BUTTON_TASK_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL);
+    xTaskCreate(PICO_ROLE.task, "BUTTON_Task", BUTTON_TASK_STACK_SIZE, NULL, BUTTON_TASK_PRIORITY, NULL);
 
     vTaskStartScheduler();
 
@@ -172,7 +170,7 @@ void mqtt_task(void *argument)
     }
 
     /* Initialize MQTT client */
-    MQTTClientInit(&g_mqtt_client, &g_mqtt_network, DEFAULT_TIMEOUT, g_mqtt_send_buf, ETHERNET_BUF_MAX_SIZE, g_mqtt_recv_buf, ETHERNET_BUF_MAX_SIZE);
+    MQTTClientInit(&PICO_ROLE.mqtt.client, &g_mqtt_network, DEFAULT_TIMEOUT, g_mqtt_send_buf, ETHERNET_BUF_MAX_SIZE, g_mqtt_recv_buf, ETHERNET_BUF_MAX_SIZE);
 
     /* Connect to the MQTT broker */
     g_mqtt_packet_connect_data.MQTTVersion = 3;
@@ -183,7 +181,7 @@ void mqtt_task(void *argument)
     g_mqtt_packet_connect_data.username.cstring = MQTT_USERNAME;
     g_mqtt_packet_connect_data.password.cstring = MQTT_PASSWORD;
 
-    retval = MQTTConnect(&g_mqtt_client, &g_mqtt_packet_connect_data);
+    retval = MQTTConnect(&PICO_ROLE.mqtt.client, &g_mqtt_packet_connect_data);
 
     if (retval < 0)
     {
@@ -205,13 +203,13 @@ void mqtt_task(void *argument)
     g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
 
     int j;
-    for (j = 1; j<9; j++) {
-        char topic[50];
-        sprintf(topic, "%s%d/config", MQTT_CONFIG_TOPIC,j);
+    for (j = 1; j<PICO_ROLE.channelsNum+1; j++) {
+        char topic[80]; 
+        strcpy(topic, PICO_ROLE.getConfigTopic(j));
         char *resp = PICO_ROLE.getConfigPayload(j);
         g_mqtt_message.payload = resp;
         g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-        retval = MQTTPublish(&g_mqtt_client, topic, &g_mqtt_message);
+        retval = MQTTPublish(&PICO_ROLE.mqtt.client, topic, &g_mqtt_message);
         if (retval < 0)
         {
             printf(" Publish Config failed : %d\n", retval);
@@ -230,7 +228,7 @@ void mqtt_task(void *argument)
     /* Subscribe */
     for (j = 1; j<9; j++) {
         //sprintf(topicCom[j-1],"homeassistant/switch/picoRelaySwitch1Channel%d/set",j);
-        retval = MQTTSubscribe(&g_mqtt_client, PICO_ROLE.topicCom[j-1], QOS0, PICO_ROLE.mqtt.message_arrived);
+        retval = MQTTSubscribe(&PICO_ROLE.mqtt.client, PICO_ROLE.topicCom[j-1], QOS0, PICO_ROLE.mqtt.message_arrived);
         if (retval < 0)
         {
             printf(" Subscribe failed : %d\n", retval);
@@ -251,7 +249,7 @@ void mqtt_task(void *argument)
         /* Publish */
         g_mqtt_message.payload = MQTT_PUBLISH_PAYLOAD;
         g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-        retval = MQTTPublish(&g_mqtt_client, MQTT_PUBLISH_TOPIC, &g_mqtt_message);
+        retval = MQTTPublish(&PICO_ROLE.mqtt.client, MQTT_PUBLISH_TOPIC, &g_mqtt_message);
 
         if (retval < 0)
         {
@@ -277,7 +275,7 @@ void yield_task(void *argument)
     {
         if (g_mqtt_connect_flag == 1)
         {
-            if ((retval = MQTTYield(&g_mqtt_client, g_mqtt_packet_connect_data.keepAliveInterval)) < 0)
+            if ((retval = MQTTYield(&PICO_ROLE.mqtt.client, g_mqtt_packet_connect_data.keepAliveInterval)) < 0)
             {
                 printf(" Yield error : %d\n", retval);
 
@@ -289,47 +287,6 @@ void yield_task(void *argument)
         }
 
         vTaskDelay(10);
-    }
-}
-
-void button_task(void *argument)
-{
-    while (1)
-    {
-        for(int i=0; i<8; i++){
-            if (gpio_get(PICO_ROLE.channelsIn[i])) {
-                vTaskDelay(200);
-                if (!gpio_get(PICO_ROLE.channelsIn[i])) {
-                    printf("PRESS");
-                    if (PICO_ROLE.channelsStatus[i]) {
-                        g_mqtt_message.payload = "OFF";
-                        PICO_ROLE.channelsStatus[i]=0;
-                    }else{
-                        g_mqtt_message.payload = "ON";
-                        PICO_ROLE.channelsStatus[i]=1;
-                    }
-                    gpio_put(PICO_ROLE.channelsOut[i], PICO_ROLE.channelsStatus[i]);
-                    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-                    MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[i], &g_mqtt_message);
-                    vTaskDelay(200);
-                }else{
-                    printf("LONG PRESS");
-                    if (PICO_ROLE.channelsStatus[i]) {
-                        g_mqtt_message.payload = "OFF";
-                        PICO_ROLE.channelsStatus[i]=0;
-                    }else{
-                        g_mqtt_message.payload = "ON";
-                        PICO_ROLE.channelsStatus[i]=1;
-                    }
-                    gpio_put(PICO_ROLE.channelsOut[i], PICO_ROLE.channelsStatus[i]);
-                    g_mqtt_message.payloadlen = strlen(g_mqtt_message.payload);
-                    MQTTPublish(&g_mqtt_client, PICO_ROLE.topicStat[i], &g_mqtt_message);
-                    vTaskDelay(200);
-
-                }
-            }
-        }
-        vTaskDelay(100);
     }
 }
 
