@@ -104,9 +104,6 @@ void button_task(void *argument);
 /* Clock */
 static void set_clock_khz(void);
 
-/* Pin work*/
-void initPins(void);
-
 /* MQTT */
 static void message_arrived(MessageData *msg_data);
 char * getConfigPayload(int j);
@@ -128,7 +125,7 @@ int main()
     stdio_init_all();
 
     initPicoRole();
-    initPins();
+    PICO_ROLE.initPins();
 
     wizchip_spi_initialize();
     wizchip_cris_initialize();
@@ -358,16 +355,7 @@ static void set_clock_khz(void)
     );
 }
 
-/* Pin Work */
-void initPins(void)
-{
-    for (int j = 0; j < 8 ; j++) {
-        gpio_init(PICO_ROLE.channelsOut[j]);
-        gpio_set_dir(PICO_ROLE.channelsOut[j], GPIO_OUT);
-        gpio_init(PICO_ROLE.channelsIn[j]);
-        gpio_set_dir(PICO_ROLE.channelsIn[j], GPIO_IN);
-    }
-}
+
 
 /* MQTT */
 static void message_arrived(MessageData *msg_data)

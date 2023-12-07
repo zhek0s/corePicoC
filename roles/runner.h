@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdio.h>
-#include <string.h>
+#include "../port/port_common.h"
 
 #ifndef _PICO_ROLE_DEF_
 #define _PICO_ROLE_DEF_                      relaySwitch   // relaySwitch
@@ -21,6 +20,7 @@ typedef struct __PICO_ROLE
     uint channelsIn[8];
     uint channelsStatus[8];
     char* (*getConfigPayload)(int j);
+    void (*initPins)(void);
 }_PICO_ROLE;
 extern _PICO_ROLE  PICO_ROLE;
 
@@ -28,3 +28,6 @@ void initPicoRole(void);
 char * _getConfigPayload(int j);
 void generateTopicStat(void);
 void generateTopicCom(void);
+
+//relaySwitch
+void initPinsRelaySwitch(void);
